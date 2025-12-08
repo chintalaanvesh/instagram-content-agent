@@ -1,0 +1,25 @@
+# Python cache
+__pycache__/
+*.pyc
+
+# Virtual environments
+venv/
+.env
+
+# Node modules (if you ever use JS)
+node_modules/
+
+# Experiments: only commit metadata, not images
+experiments/*/*.png
+experiments/*/*.jpg
+
+# Do NOT commit secrets
+*.json
+*.pem
+*.key
+credentials/
+secrets/
+
+# OS files
+.DS_Store
+Thumbs.db
