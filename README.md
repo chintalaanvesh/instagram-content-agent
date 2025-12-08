@@ -1,4 +1,4 @@
-# 📸 Instagram AI Content Agent  
+# Instagram AI Content Agent  
 ### **Automated AI-powered Instagram news generation, design & publishing pipeline**
 
 This repository contains an end-to-end automation system that **fetches AI news, ranks it, generates captions, designs carousel images, and logs everything to Google Sheets** — completely automatically.
@@ -7,21 +7,21 @@ Built using **n8n**, **OpenAI GPT-4o**, **Google Gemini Imagen**, **Cloudinary**
 
 ---
 
-## 🚀 Features
+## Features
 
-### 🔍 **1. Automated AI News Fetching**
+### **1. Automated AI News Fetching**
 - Reads RSS feeds from top tech & AI sites  
 - Cleans and normalizes article data  
 - Filters content based on publication time  
 
-### 🧠 **2. Relevance & Virality Scoring (LLM)**
+### **2. Relevance & Virality Scoring (LLM)**
 Each article is evaluated based on:
 - **Relevance**  
 - **Virality potential**  
 - **Recency**  
 - Weighted scoring system picks the *top 3* stories of the day  
 
-### ✍️ **3. Caption Generator**
+### **3. Caption Generator**
 Creates:
 - High-converting **Hooks**  
 - Scroll-stopping **captions** (3–4 paragraphs)  
@@ -29,24 +29,24 @@ Creates:
 
 Strict JSON output ensures reliability with n8n workflows.
 
-### 🖼️ **4. Image Strategy Engine**
+### **4. Image Strategy Engine**
 For each article:
 - Decides number of images (1–4)  
 - Determines whether to use **AI images** or **stock images**  
 - Generates **overlay text** for each slide  
 
-### 🎨 **5. AI Image Generation**
+### **5. AI Image Generation**
 - Uses **Gemini Imagen 4.0 Ultra** to create cinematic, IG-ready assets  
 - Converts overlay text into rich, world-class prompts  
 - Ensures visual consistency across carousel  
 
-### 🧰 **6. Cloudinary Image Enhancement**
+### **6. Cloudinary Image Enhancement**
 - Adds background overlays  
 - Inserts the mobile-optimized text box  
 - Creates finalized **Instagram-ready** images  
 - Returns CDN URLs  
 
-### 🧾 **7. Google Sheets Content Log**
+### **7. Google Sheets Content Log**
 Automatically appends:
 - Hook  
 - Caption  
@@ -58,21 +58,7 @@ Functions as your long-term **content calendar**.
 
 ---
 
-## 🛠️ Tech Stack
-
-| Technology | Purpose |
-|------------|---------|
-| **n8n** | Orchestration & workflow automation |
-| **OpenAI GPT-4o / GPT-mini** | Relevance scoring + text generation |
-| **Google Gemini Imagen 4.0** | AI image generation |
-| **Cloudinary** | Image hosting + post-processing |
-| **Google Drive & Sheets** | Content storage + logging |
-| **RSS Feeds** | Source of AI news |
-
-
----
-
-## 🛠️ Tech Stack
+## Tech Stack
 
 | Technology | Purpose |
 |------------|---------|
@@ -85,7 +71,7 @@ Functions as your long-term **content calendar**.
 
 ---
 
-## 🔐 Security & Credentials
+## Security & Credentials
 
 This repository intentionally **does not include**:
 - API keys  
@@ -100,11 +86,11 @@ Each module contains its own `CREDENTIALS.md` explaining:
 - How to configure them after importing workflows  
 - What NOT to store in the repo  
 
-⚠️ **Always export n8n workflows WITHOUT credentials.**
+ **Always export n8n workflows WITHOUT credentials.**
 
 ---
 
-## 📦 Setup & Installation
+## Setup & Installation
 
 ### 1️⃣ Clone this repo
 ```bash
@@ -169,14 +155,14 @@ The system is scheduled to run daily, but it can also be run manually from insid
 
 ---
 
-### 🤝 Contributing
+### Contributing
 
 Contributions are welcome!  
 Please open an issue or submit a pull request.
 
 ---
 
-### 📄 License
+### License
 
 MIT License — free to use, modify, and build upon.
 
