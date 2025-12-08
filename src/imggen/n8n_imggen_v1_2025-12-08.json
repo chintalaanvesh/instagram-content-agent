@@ -1,0 +1,215 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "options": {
+          "reset": "={{ $prevNode.name==='Split Out1' }}"
+        }
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        4048,
+        -272
+      ],
+      "id": "5af5e413-bfa1-40ae-bf94-9f4bab981a6e",
+      "name": "Loop Over Items5"
+    },
+    {
+      "parameters": {
+        "resource": "image",
+        "modelId": {
+          "__rl": true,
+          "value": "models/imagen-4.0-ultra-generate-preview-06-06",
+          "mode": "list",
+          "cachedResultName": "models/imagen-4.0-ultra-generate-preview-06-06"
+        },
+        "prompt": "={{ $('Loop Over Items5').item.json.prompt }}",
+        "options": {
+          "sampleCount": 1
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1,
+      "position": [
+        4256,
+        -256
+      ],
+      "id": "a9cb4933-76f6-4afb-8784-936a7141e20a",
+      "name": "Generate an image1",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "rPZ7gTDrU2sSRGTD",
+          "name": "anvesh-gemini-account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.cloudinary.com/v1_1/dlygycwmf/image/upload",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "upload_preset",
+              "value": "CLOUDINARY_UPLOAD_PRESET"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "file",
+              "inputDataFieldName": "data"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        4448,
+        -256
+      ],
+      "id": "2e0589c9-699d-4d47-90c6-985c86d04219",
+      "name": "HTTP Request5"
+    },
+    {
+      "parameters": {
+        "jsCode": "// --- CONFIGURATION ---\nconst CLOUD_NAME = 'dlygycwmf'; \nconst FONT = 'Verdana'; \nconst FONT_SIZE = 48;   \nconst TEXT_COLOR = 'ffffff';\n\n// --- BOX SETTINGS ---\nconst BOX_COLOR = '101010';     \nconst BOX_OPACITY = 85;         \nconst BOX_WIDTH = 900;\nconst BOX_HEIGHT = 210;         \nconst BOX_Y_FROM_BOTTOM = 140;\nconst CORNER_RADIUS = 30;       \nconst BORDER_WIDTH = 2;\nconst BORDER_COLOR = 'ffffff60'; \n\n// --- HELPER: Safe Text Encoding ---\nfunction encodeCloudinaryText(str) {\n  if (!str) return '';\n  let s = String(str).trim();\n  const lines = s.split(/\\r\\n|\\r|\\n/);\n  \n  // Encode each line\n  const encodedLines = lines.map(line => {\n    let encoded = encodeURIComponent(line);\n    // Double-encode commas and slashes so Cloudinary treats them as text\n    encoded = encoded.replace(/%2C/g, '%252C');\n    encoded = encoded.replace(/%2F/g, '%252F');\n    return encoded;\n  });\n  \n  let clean = encodedLines.join('%0A');\n  return clean;\n}\n\nreturn items.map((item, index) => {\n  try {\n    const publicId = item.json.public_id;\n    if (!publicId) throw new Error(`Item ${index}: Missing public_id`);\n\n    const imgHeight = parseInt(item.json.height) || 1024;\n    const rawText = item.json.overlay_text || 'Breaking AI News';\n    const encodedText = encodeCloudinaryText(rawText);\n\n    // --- CALCULATE POSITIONING ---\n    const boxCenterFromBottom = BOX_Y_FROM_BOTTOM + (BOX_HEIGHT / 2);\n    const targetPixelY = imgHeight - boxCenterFromBottom;\n    const imageCenterY = imgHeight / 2;\n    const yOffsetForCenter = Math.round(targetPixelY - imageCenterY);\n\n    // --- CREATE TEXT WITH BACKGROUND BOX ---\n    // Cloudinary text overlay with background - verified syntax\n    const textWithBoxLayer = [\n      // Text layer definition\n      `l_text:${FONT}_${FONT_SIZE}_bold_center:${encodedText}`,\n      // Styling parameters\n      `co_rgb:${TEXT_COLOR}`,\n      `b_rgb:${BOX_COLOR}`,\n      `o_${BOX_OPACITY}`,\n      `w_${BOX_WIDTH - 60}`,\n      `c_fit`,\n      `bo_${BORDER_WIDTH}px_solid_rgb:${BORDER_COLOR}`,\n      `r_${CORNER_RADIUS}`,\n      // Layer application and positioning\n      `fl_layer_apply`,\n      `g_center`,\n      `y_${yOffsetForCenter}`\n    ].join(',');\n\n    // --- ASSEMBLE URL ---\n    const baseUrl = `https://res.cloudinary.com/${CLOUD_NAME}/image/upload`;\n    const finalUrl = `${baseUrl}/${textWithBoxLayer}/${publicId}.png`;\n\n    return {\n      json: {\n        ...item.json,\n        generated_instagram_url: finalUrl\n      }\n    };\n\n  } catch (error) {\n    return {\n      json: {\n        ...item.json,\n        error: true,\n        error_message: error.message,\n        generated_instagram_url: null \n      }\n    };\n  }\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4784,
+        -256
+      ],
+      "id": "686f4480-4050-46ad-bd65-aa4c03a9af71",
+      "name": "Code in JavaScript9"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "123ab0e6-1143-4033-935e-b0844744f3a8",
+              "name": "overlay_text",
+              "value": "={{ $('Loop Over Items5').item.json.overlay_text }}",
+              "type": "string"
+            },
+            {
+              "id": "72c2c22a-7ab1-42e0-bf90-17bf09d21f5b",
+              "name": "secure_url",
+              "value": "={{ $node[\"HTTP Request5\"].json[\"secure_url\"] }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        4592,
+        -256
+      ],
+      "id": "a35b4d6f-e411-4706-a286-960c2552e4ea",
+      "name": "Edit Fields14"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.generated_instagram_url }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        4992,
+        -256
+      ],
+      "id": "6e4aa66f-4349-4e7b-8863-dce67e0459b8",
+      "name": "HTTP Request6",
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "Loop Over Items5": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Generate an image1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate an image1": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request5": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields14",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript9": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields14": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript9",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request6": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "17e32a252a2a6e7730cfce5e5cc930969e2fb59d69180c6f036cdff498d50e7e"
+  }
+}
