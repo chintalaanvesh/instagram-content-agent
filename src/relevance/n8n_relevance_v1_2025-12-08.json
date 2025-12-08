@@ -1,0 +1,244 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        592,
+        -192
+      ],
+      "id": "9f97ffd4-f402-44e8-a65d-83aa2f4897c0",
+      "name": "Loop Over Items1"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "GPT-4O-MINI"
+        },
+        "responses": {
+          "values": [
+            {
+              "role": "system",
+              "content": "=You are an objective news editor and scorer. Always return ONLY a single valid JSON object and nothing else (no text, no code fences, no commentary). The object must have exactly three integer fields: relevance, virality, recency_score. If any field cannot be produced, set it to null.\n"
+            },
+            {
+              "content": "=You will receive an article with fields: title, summary, url, source, publishedAt.\n\nTask: evaluate how suitable this article is for a short Instagram post aimed at busy students and corporate professionals who want quick, actionable AI news updates.\n\nReturn exactly one JSON object with these fields (and nothing else):\n\n{\n  \"relevance\": INT,       // 0-100: favors product launches, tools, releases, integrations that change workflows/costs\n  \"virality\": INT,        // 0-100: favors surprising claims, practical ROI, strong visuals\n  \"recency_score\": INT    // 0-100: 100<=1h, 80<=6h, 60<=24h, 30<=72h, 0>7d\n  \"title\": \"{{ $json.Title }}\",\"summary\":\"{{ $json.Content }}\",\"url\":\"{{ $json.Link }}\",\"publishedAt\":\"{{ $json.Date }}\"}\n}\n\nRules:\n- Return only the JSON object and nothing else (no explanation, no backticks, no extra keys).\n- Use integers (no decimals).\n- If a score cannot be computed, set that field to null.\n\nInput article:\n{\"title\":\"{{ $json.Title }}\",\"summary\":\"{{ $json.Content }}\",\"url\":\"{{ $json.Link }}\",\"publishedAt\":\"{{ $json.Date }}\"}\n\n"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2,
+      "position": [
+        800,
+        -96
+      ],
+      "id": "3902acad-fc94-4ec2-8c01-d73f8615dede",
+      "name": "Message a model1",
+      "credentials": {
+        "openAiApi": {
+          "id": "0mJw6adwDFRk62ts",
+          "name": "anvesh-openai"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "10f91af0-1043-4d1e-beb8-7de3d9df8bfe",
+              "name": "relevance",
+              "value": "={{ (function(raw){\n  raw = raw || '';\n  // Try JSON.parse on common chat fields\n  try {\n    const parsed = (typeof raw === 'object') ? raw : JSON.parse(raw);\n    if (parsed && parsed.relevance != null) return Number(parsed.relevance);\n  } catch(e) {}\n  // Try double-parse (escaped JSON inside string)\n  try {\n    const step = JSON.parse(raw);\n    const parsed2 = (typeof step === 'string') ? JSON.parse(step) : step;\n    if (parsed2 && parsed2.relevance != null) return Number(parsed2.relevance);\n  } catch(e) {}\n  // Regex fallback (works on any string)\n  const s = raw.toString();\n  const m = s.match(/\"relevance\"\\s*:\\s*([0-9]{1,3})/i) || s.match(/relevance\\s*:\\s*([0-9]{1,3})/i);\n  return m ? Number(m[1]) : 0;\n})(\n  $json.output?.[0]?.content?.[0]?.text \n  || ($json.choices && $json.choices[0] && $json.choices[0].message && $json.choices[0].message.content) \n  || $json.text \n  || ''\n) }}",
+              "type": "number"
+            },
+            {
+              "id": "fb75c01e-576a-4031-9010-a57127f161a2",
+              "name": "virality",
+              "value": "={{ (function(raw){\n  raw = raw || '';\n  try {\n    const parsed = (typeof raw === 'object') ? raw : JSON.parse(raw);\n    if (parsed && parsed.virality != null) return Number(parsed.virality);\n  } catch(e) {}\n  try {\n    const step = JSON.parse(raw);\n    const parsed2 = (typeof step === 'string') ? JSON.parse(step) : step;\n    if (parsed2 && parsed2.virality != null) return Number(parsed2.virality);\n  } catch(e) {}\n  const s = raw.toString();\n  const m = s.match(/\"virality\"\\s*:\\s*([0-9]{1,3})/i) || s.match(/virality\\s*:\\s*([0-9]{1,3})/i);\n  return m ? Number(m[1]) : 0;\n})(\n  $json.output?.[0]?.content?.[0]?.text \n  || ($json.choices && $json.choices[0] && $json.choices[0].message && $json.choices[0].message.content) \n  || $json.text \n  || ''\n) }}",
+              "type": "number"
+            },
+            {
+              "id": "50b383ec-d713-41d1-b049-67b2c87df9f5",
+              "name": "recency_score",
+              "value": "={{ (function(raw){\n  raw = raw || '';\n  try {\n    const parsed = (typeof raw === 'object') ? raw : JSON.parse(raw);\n    if (parsed && parsed.recency_score != null) return Number(parsed.recency_score);\n  } catch(e) {}\n  try {\n    const step = JSON.parse(raw);\n    const parsed2 = (typeof step === 'string') ? JSON.parse(step) : step;\n    if (parsed2 && parsed2.recency_score != null) return Number(parsed2.recency_score);\n  } catch(e) {}\n  const s = raw.toString();\n  const m = s.match(/\"recency_score\"\\s*:\\s*([0-9]{1,3})/i) || s.match(/recency_score\\s*:\\s*([0-9]{1,3})/i);\n  return m ? Number(m[1]) : 0;\n})(\n  $json.output?.[0]?.content?.[0]?.text \n  || ($json.choices && $json.choices[0] && $json.choices[0].message && $json.choices[0].message.content) \n  || $json.text \n  || ''\n) }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        800,
+        -288
+      ],
+      "id": "359af3ba-00bf-439f-8815-1fdc89fff1b4",
+      "name": "Edit Fields2"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "63bf22f6-bffd-45c3-80cf-66a0d8d6bcdd",
+              "name": "final_score",
+              "value": "={{ 0.5 * $json.relevance + 0.3 * $json.virality + 0.2 * $json.recency_score }}",
+              "type": "number"
+            },
+            {
+              "id": "33be376c-d214-4693-a771-96ebde87287c",
+              "name": "Creator",
+              "value": "={{ $('Edit Fields15').item.json.Creator }}",
+              "type": "string"
+            },
+            {
+              "id": "13d576e2-b1c5-4414-be91-670856b45390",
+              "name": "Title",
+              "value": "={{ $('Edit Fields15').item.json.Title }}",
+              "type": "string"
+            },
+            {
+              "id": "bb95254d-5fb2-42d5-8726-9541db7d2ced",
+              "name": "Link",
+              "value": "={{ $('Edit Fields15').item.json.Link }}",
+              "type": "string"
+            },
+            {
+              "id": "24a22740-664f-4e11-a5c2-55120265fc83",
+              "name": "Content",
+              "value": "={{ $('Edit Fields15').item.json.Content }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1008,
+        -288
+      ],
+      "id": "6adf751f-616c-415b-988d-4d7d5cc78317",
+      "name": "Edit Fields3"
+    },
+    {
+      "parameters": {
+        "sortFieldsUi": {
+          "sortField": [
+            {
+              "fieldName": "final_score",
+              "order": "descending"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.sort",
+      "typeVersion": 1,
+      "position": [
+        1200,
+        -288
+      ],
+      "id": "87b6c9ca-a247-45fa-b15a-61dd9e2014b1",
+      "name": "Sort"
+    },
+    {
+      "parameters": {
+        "maxItems": 3
+      },
+      "type": "n8n-nodes-base.limit",
+      "typeVersion": 1,
+      "position": [
+        1376,
+        -288
+      ],
+      "id": "ee62f588-4d8b-4fbf-9ed7-e941cc7bfe28",
+      "name": "Limit"
+    }
+  ],
+  "connections": {
+    "Loop Over Items1": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Message a model1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model1": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields2": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields3": {
+      "main": [
+        [
+          {
+            "node": "Sort",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sort": {
+      "main": [
+        [
+          {
+            "node": "Limit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limit": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "17e32a252a2a6e7730cfce5e5cc930969e2fb59d69180c6f036cdff498d50e7e"
+  }
+}
