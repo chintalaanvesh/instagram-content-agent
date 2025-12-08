@@ -1,0 +1,25 @@
+{
+  "run_id": "2025-12-08_10-00",
+  "sources": ["https://example-ai-site/article1"],
+  "audience_profile": "general-ai-enthusiasts",
+  "items": [
+    {
+      "hook": "This new AI model just surprised everyone",
+      "caption": "A quick look at the latest AI breakthrough and what it means.",
+      "hashtags": ["#ai", "#machinelearning", "#aitrends"],
+      "num_images": 2,
+      "images": [
+        {
+          "url": "https://example-bucket.com/img1.jpg",
+          "overlay_text": "AI breakthrough!",
+          "prompt": "futuristic city, ai breakthrough, digital energy lines"
+        },
+        {
+          "url": "https://example-bucket.com/img2.jpg",
+          "overlay_text": "Here's what it means",
+          "prompt": "abstract ai brain, neon glow, tech patterns"
+        }
+      ]
+    }
+  ]
+}
