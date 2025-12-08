@@ -1,0 +1,377 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "chatgpt-4o-latest",
+          "mode": "list",
+          "cachedResultName": "CHATGPT-4O-LATEST"
+        },
+        "responses": {
+          "values": [
+            {
+              "role": "system",
+              "content": "=You are an expert Instagram content strategist for busy students and corporate professionals who want fast AI updates.\n\nOUTPUT RULES (MANDATORY):\n1. Output ONLY a single valid JSON object and nothing else.\n2. Do NOT use markdown, backticks, code fences, or any text outside the JSON.\n3. The response MUST start with \"{\" and end with \"}\".\n4. Hook: max 110 characters, curiosity-driven.\n5. caption: 3–4 short paragraphs separated by \\n\\n (no extra whitespace).\n6. hashtags: single string of 8–15 hashtags starting with #. No emojis.\n7. If any rule cannot be satisfied, still output a JSON object with keys and an appropriate message value.\n\nMANDATORY JSON FORMAT:\n{\"Hook\": \"...\", \"caption\": \"...\", \"hashtags\": \"...\"}\n\nIf you produce anything else you are violating the rules.\n"
+            },
+            {
+              "content": "=Given the following AI news article, create high-engagement Instagram content for a student + corporate audience.\n\nNow analyze this article:\n\n{\n\"title\": \"{{ $json.Title }}\",\n  \"summary\": \"{{ $json.Content }}\",\n  \"url\": \"{{ $json.Link }}\",\n  \"publishedAt\": \"{{ $json.Date }}\"\n}\n\nOutput only a single JSON:\nMANDATORY JSON FORMAT - \n{\"Hook\": \"...\", \"caption\": \"...\", \"hashtags\": \"...\"}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2,
+      "position": [
+        1776,
+        -272
+      ],
+      "id": "73f0d233-b716-446d-8987-5a773a790faf",
+      "name": "Message a model2",
+      "credentials": {
+        "openAiApi": {
+          "id": "0mJw6adwDFRk62ts",
+          "name": "anvesh-openai"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1552,
+        -288
+      ],
+      "id": "bd86ff7b-cf52-43f1-a1be-1b5c642d9b5e",
+      "name": "Loop Over Items3"
+    },
+    {
+      "parameters": {
+        "jsCode": "// n8n Function node - Robust JSON sanitizer + parser\n// Input: items[*] - tries to locate assistant text in common places\n// Output: { Hook, caption, hashtags } or error/debug info\n\nfunction findTextField(obj) {\n  if (!obj) return null;\n  // common paths in payloads you showed\n  if (typeof obj.text === 'string') return obj.text;\n  if (obj.output && Array.isArray(obj.output)) {\n    for (const o of obj.output) {\n      if (o.content && Array.isArray(o.content)) {\n        for (const c of o.content) {\n          if (typeof c.text === 'string') return c.text;\n        }\n      }\n      if (typeof o.text === 'string') return o.text;\n    }\n  }\n  // fallback: stringified\n  return JSON.stringify(obj);\n}\n\nfunction findJsonSubstring(s) {\n  if (!s || typeof s !== 'string') return null;\n  // strip obvious markdown/code fences/backticks\n  s = s.replace(/```json|```/gi, '').replace(/`/g, '');\n  const start = s.indexOf('{');\n  if (start === -1) return null;\n  let stack = 0;\n  for (let i = start; i < s.length; i++) {\n    const ch = s[i];\n    if (ch === '{') stack++;\n    else if (ch === '}') {\n      stack--;\n      if (stack === 0) return s.slice(start, i + 1);\n    }\n  }\n  return null;\n}\n\n// sanitize problematic control chars and normalize punctuation\nfunction sanitizeCandidate(raw) {\n  // If the string already contains literal sequences like \\\\n (two chars), keep them.\n  // We'll operate on the raw as-is, but convert problematic control chars to \\uXXXX.\n  let s = raw;\n\n  // Replace common “smart” punctuation with ASCII equivalents\n  s = s.replace(/\\u2018|\\u2019/g, \"'\"); // left/right single quote -> '\n  s = s.replace(/\\u201C|\\u201D/g, '\"'); // left/right double quote -> \"\n  s = s.replace(/\\u2013|\\u2014/g, '-'); // ndash/mdash -> -\n  s = s.replace(/\\u2026/g, '...');      // ellipsis\n\n  // Replace literal unescaped backslashes that might break JSON (turn single \\ into \\\\)\n  // But avoid double-escaping existing escape sequences like \\\\n (two chars). We'll do a safe replace:\n  s = s.replace(/(^|[^\\\\])\\\\(?![ntr\"\\\\\\/bfnu])/g, function(m, p1) { return p1 + '\\\\\\\\'; });\n\n  // Convert any raw control chars (0x00 - 0x1F) except newline/tab/carriage return\n  s = s.replace(/[\\u0000-\\u0008\\u000B\\u000C\\u000E-\\u001F]/g, function(ch) {\n    const code = ch.charCodeAt(0);\n    return '\\\\u' + ('000' + code.toString(16)).slice(-4);\n  });\n\n  return s;\n}\n\n// helper: safe JSON decode of an extracted quoted string content\nfunction decodeQuotedStringContent(strContent) {\n  // strContent is the inner content captured from \"key\": \"INNER\"\n  // Build a quoted JSON string and let JSON.parse decode escapes\n  try {\n    return JSON.parse('\"' + strContent.replace(/\"/g, '\\\\\"') + '\"');\n  } catch (e) {\n    // fallback: return raw\n    return strContent;\n  }\n}\n\n// regex-safe extractor for keys if JSON.parse fails\nfunction fallbackFieldExtract(candidate) {\n  const out = { Hook: null, caption: null, hashtags: null };\n\n  // pattern to capture string value allowing escaped quotes\n  const re = /\"Hook\"\\s*:\\s*\"((?:\\\\.|[^\"\\\\])*)\"/s;\n  const m = candidate.match(re);\n  if (m) out.Hook = decodeQuotedStringContent(m[1]);\n\n  const re2 = /\"caption\"\\s*:\\s*\"((?:\\\\.|[^\"\\\\])*)\"/s;\n  const m2 = candidate.match(re2);\n  if (m2) out.caption = decodeQuotedStringContent(m2[1]);\n\n  const re3 = /\"hashtags\"\\s*:\\s*\"((?:\\\\.|[^\"\\\\])*)\"/s;\n  const m3 = candidate.match(re3);\n  if (m3) out.hashtags = decodeQuotedStringContent(m3[1]);\n\n  return out;\n}\n\nconst results = [];\n\nfor (const item of items) {\n  const rawText = findTextField(item.json) || findTextField(item);\n  const candidateRaw = findJsonSubstring(rawText);\n\n  if (!candidateRaw) {\n    results.push({ json: { error: 'No JSON candidate found', rawText } });\n    continue;\n  }\n\n  // First sanitize\n  const sanitized = sanitizeCandidate(candidateRaw);\n\n  // Try JSON.parse directly\n  try {\n    const parsed = JSON.parse(sanitized);\n    results.push({\n      json: {\n        Hook: parsed.Hook || parsed.hook || null,\n        caption: parsed.caption || null,\n        hashtags: parsed.hashtags || parsed.hashtag || parsed.tags || null,\n        _candidate: candidateRaw,\n        _sanitized: sanitized\n      }\n    });\n    continue;\n  } catch (err) {\n    // JSON.parse failed after sanitization — attempt fallback extraction per-field\n    const fallback = fallbackFieldExtract(sanitized);\n\n    // If fallback found at least one field, return that (helps when parsed JSON broken but fields intact)\n    if (fallback.Hook || fallback.caption || fallback.hashtags) {\n      results.push({\n        json: {\n          Hook: fallback.Hook,\n          caption: fallback.caption,\n          hashtags: fallback.hashtags,\n          note: 'Used fallback regex extraction (JSON.parse failed)',\n          parseError: err.message,\n          _candidate: candidateRaw,\n          _sanitized: sanitized\n        }\n      });\n    } else {\n      // Last-ditch: try replacing literal unescaped newline characters with escaped \\\\n and parse\n      const escapeNL = sanitized.replace(/\\n/g, '\\\\n');\n      try {\n        const parsed2 = JSON.parse(escapeNL);\n        results.push({\n          json: {\n            Hook: parsed2.Hook || null,\n            caption: parsed2.caption || null,\n            hashtags: parsed2.hashtags || null,\n            _candidate: candidateRaw,\n            _sanitized: escapeNL,\n            note: 'Parsed after escaping literal newlines'\n          }\n        });\n      } catch (err2) {\n        // Give debugging info\n        results.push({\n          json: {\n            error: 'JSON parse error (sanitizer fallback failed)',\n            message: err.message,\n            message2: err2 ? err2.message : null,\n            candidate: candidateRaw,\n            sanitized,\n            rawText\n          }\n        });\n      }\n    }\n  }\n}\n\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2128,
+        -272
+      ],
+      "id": "d84db62f-5380-41e6-9510-e3ff4ff8ec84",
+      "name": "Code in JavaScript5"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "96726637-4e99-43ef-9d11-ed58b78673f9",
+              "name": "Hook",
+              "value": "={{ $('Code in JavaScript5').item.json.Hook }}",
+              "type": "string"
+            },
+            {
+              "id": "67ccd653-4c3b-484b-82e4-1859db4af211",
+              "name": "Caption",
+              "value": "={{ $('Code in JavaScript5').item.json.caption }}",
+              "type": "string"
+            },
+            {
+              "id": "e273359a-90e6-4647-a3b7-2df0fb4a5ae1",
+              "name": "Hashtags",
+              "value": "={{ $('Code in JavaScript5').item.json.hashtags }}",
+              "type": "string"
+            },
+            {
+              "id": "b27781b6-fa10-4a44-a906-8f5f2f45dbea",
+              "name": "Creator",
+              "value": "={{ $('Loop Over Items3').item.json.Creator }}",
+              "type": "string"
+            },
+            {
+              "id": "9486c1b6-d2b5-4eae-b32b-7a7755e10271",
+              "name": "Title",
+              "value": "={{ $('Loop Over Items3').item.json.Title }}",
+              "type": "string"
+            },
+            {
+              "id": "d51d09a2-c7d9-481f-b60d-be43bddafcd1",
+              "name": "Link",
+              "value": "={{ $('Loop Over Items3').item.json.Link }}",
+              "type": "string"
+            },
+            {
+              "id": "b9853f04-1b75-4e27-8c8a-8af164b91116",
+              "name": "Date",
+              "value": "={{ $('Loop Over Items3').item.json.Date }}",
+              "type": "string"
+            },
+            {
+              "id": "e78d9ef8-f6d0-470c-9e0e-67c99eb7321e",
+              "name": "Content",
+              "value": "={{ $('Loop Over Items3').item.json.Content }}",
+              "type": "string"
+            },
+            {
+              "id": "39a9fffb-f612-4b56-97e6-202c7e293b61",
+              "name": "No_of_images",
+              "value": "={{ $('Code in JavaScript6').item.json.No_of_images }}",
+              "type": "number"
+            },
+            {
+              "id": "39b6ebec-1d9f-4a4d-a185-60ba9101edb0",
+              "name": "AI_generated",
+              "value": "={{ $json.AI_generated }}",
+              "type": "boolean"
+            },
+            {
+              "id": "ba4a9c49-d102-4bf7-b515-417b744988b5",
+              "name": "images[0]",
+              "value": "={{ $json.images[0].overlay_text }}",
+              "type": "string"
+            },
+            {
+              "id": "72817257-4555-46e2-87b3-a1060f052e62",
+              "name": "images[1]",
+              "value": "={{ $json.images[1].overlay_text }}",
+              "type": "string"
+            },
+            {
+              "id": "8029660c-f281-432b-9727-9f394174efc1",
+              "name": "images[2]",
+              "value": "={{ $json.images[2].overlay_text }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2928,
+        -272
+      ],
+      "id": "dbddc3eb-a858-4c52-83bc-9b5ca51ba049",
+      "name": "Edit Fields11"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "chatgpt-4o-latest",
+          "mode": "list",
+          "cachedResultName": "CHATGPT-4O-LATEST"
+        },
+        "responses": {
+          "values": [
+            {
+              "role": "system",
+              "content": "=You are an expert Instagram visual strategist for AI news posts.\n\nYour job is to analyze an article and decide:\n1. The optimal number of images for an Instagram carousel (1–4).\n2. A short overlay text for each image (3–8 words, max 2 short lines, no special characters including ',').\n3. Whether the ENTIRE post should use AI-generated images (Gemini) or stock images (Pexels/Wikimedia). \n   This is a single boolean field: \n   - \"AI_generated\": true  → use Gemini for all images\n   - \"AI_generated\": false → use stock images for all images\n\nDECISION CRITERIA:\n- Use AI_generated = true when visuals are conceptual, futuristic, abstract, or metaphor-based.\n- Use AI_generated = false when visuals require credibility: real people, real companies, enterprise stats, charts, factual reporting.\n- Overlay text must be concise, mobile-friendly, scannable, and must not contain any special characters even commas\n\nSTRICT OUTPUT RULES:\n- Output ONLY a valid JSON object.\n- Response MUST start with \"{\" and end with \"}\".\n- No markdown, no backticks, no commentary.\n- All strings must use double quotes.\n- If overlay text needs two lines, use a literal \"\\n\" (no real newlines).\n\nREQUIRED JSON FORMAT:\n{\n  \"No_of_images\": <integer>,\n  \"AI_generated\": <true|false>,\n  \"images\": [\n    {\n      \"index\": <1-based integer>,\n      \"overlay_text\": \"<text>\"\n    }\n  ]\n}\n"
+            },
+            {
+              "content": "=Analyze the following article and generate the JSON output described in the system prompt.\n\nARTICLE:\n\nHook: {{ $json.Hook }}\nCaption: {{ $json.caption }}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2,
+      "position": [
+        2352,
+        -272
+      ],
+      "id": "5c324dc0-f5cc-4d0b-90cf-ca8bc9c9d33f",
+      "name": "Message a model3",
+      "credentials": {
+        "openAiApi": {
+          "id": "0mJw6adwDFRk62ts",
+          "name": "anvesh-openai"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// n8n Function node\n// Input: items[*] — expects the assistant payload you showed\n// Output: items with json containing No_of_images, AI_generated, images[]\n\nfunction getAssistantText(item) {\n  // try common path: item.json.output[0].content[0].text\n  try {\n    if (item.json && item.json.output && Array.isArray(item.json.output)) {\n      for (const out of item.json.output) {\n        if (out.content && Array.isArray(out.content)) {\n          for (const c of out.content) {\n            if (typeof c.text === 'string') return c.text;\n          }\n        }\n        if (typeof out.text === 'string') return out.text;\n      }\n    }\n  } catch (e) {}\n  // fallback: any string field\n  for (const k of Object.keys(item.json || {})) {\n    if (typeof item.json[k] === 'string' && item.json[k].trim().startsWith('{')) return item.json[k];\n  }\n  return null;\n}\n\nfunction stripFences(s) {\n  if (!s) return s;\n  return s.replace(/```json|```/gi, '').replace(/`/g, '').trim();\n}\n\nfunction findJsonSubstring(s) {\n  if (!s) return null;\n  const start = s.indexOf('{');\n  if (start === -1) return null;\n  // simple stack to find matching }\n  let stack = 0;\n  for (let i = start; i < s.length; i++) {\n    if (s[i] === '{') stack++;\n    else if (s[i] === '}') {\n      stack--;\n      if (stack === 0) return s.slice(start, i + 1);\n    }\n  }\n  return null;\n}\n\n// Main\nconst outputs = [];\n\nfor (const item of items) {\n  const raw = getAssistantText(item);\n  if (!raw) {\n    outputs.push({ json: { error: 'assistant text not found', raw: item.json } });\n    continue;\n  }\n\n  const cleaned = stripFences(raw);\n  const candidate = findJsonSubstring(cleaned) || cleaned;\n\n  // Replace literal CR/LF with escaped \\n only if they are unescaped inside quotes\n  // but for this payload we can try direct parse first\n  try {\n    const parsed = JSON.parse(candidate);\n    // Ensure overlay_text uses real newlines instead of escaped \\n if needed\n    const images = Array.isArray(parsed.images) ? parsed.images.map(img => ({\n      index: img.index != null ? img.index : null,\n      overlay_text: typeof img.overlay_text === 'string' ? img.overlay_text : (img.overlayText || null)\n    })) : [];\n\n    outputs.push({\n      json: {\n        No_of_images: parsed.No_of_images != null ? parsed.No_of_images : images.length,\n        AI_generated: typeof parsed.AI_generated === 'boolean' ? parsed.AI_generated : null,\n        images,\n        _raw_candidate: candidate\n      }\n    });\n  } catch (err) {\n    // Try a tolerant fallback: unescape literal \\\\n → \\n and parse\n    try {\n      const candidateEscapedNL = candidate.replace(/\\\\n/g, '\\\\n'); // no-op but keep explicit\n      const parsed2 = JSON.parse(candidateEscapedNL);\n      const images = Array.isArray(parsed2.images) ? parsed2.images.map(img => ({\n        index: img.index != null ? img.index : null,\n        overlay_text: typeof img.overlay_text === 'string' ? img.overlay_text : (img.overlayText || null)\n      })) : [];\n      outputs.push({\n        json: {\n          No_of_images: parsed2.No_of_images != null ? parsed2.No_of_images : images.length,\n          AI_generated: typeof parsed2.AI_generated === 'boolean' ? parsed2.AI_generated : null,\n          images,\n          _raw_candidate: candidateEscapedNL,\n          note: 'Parsed after minor fallback'\n        }\n      });\n    } catch (err2) {\n      // Final fallback: regex-extract fields\n      const fallback = { No_of_images: null, AI_generated: null, images: [] };\n      const mNum = candidate.match(/\"No_of_images\"\\s*:\\s*(\\d+)/i);\n      if (mNum) fallback.No_of_images = parseInt(mNum[1], 10);\n      const mBool = candidate.match(/\"AI_generated\"\\s*:\\s*(true|false)/i);\n      if (mBool) fallback.AI_generated = mBool[1].toLowerCase() === 'true';\n      // overlay_text occurrences\n      const reOverlay = /\"overlay_text\"\\s*:\\s*\"((?:\\\\.|[^\"\\\\])*)\"/g;\n      let mm; let idx = 1;\n      while ((mm = reOverlay.exec(candidate)) !== null) {\n        // decode simple escapes\n        const val = mm[1].replace(/\\\\\"/g, '\"').replace(/\\\\n/g, '\\n');\n        fallback.images.push({ index: idx++, overlay_text: val });\n      }\n      outputs.push({ json: { ...fallback, _raw_candidate: candidate, parse_error: err.message }});\n    }\n  }\n}\n\nreturn outputs;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2704,
+        -272
+      ],
+      "id": "556755b9-46be-4c83-9956-498dc58629d5",
+      "name": "Code in JavaScript6"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "chatgpt-4o-latest",
+          "mode": "list",
+          "cachedResultName": "CHATGPT-4O-LATEST"
+        },
+        "responses": {
+          "values": [
+            {
+              "role": "system",
+              "content": "=You are an elite AI image-prompt engineer who creates world-class prompts for Instagram carousel images.\n\nYour task is to take each overlay text (e.g., “AI is advancing faster than expected”) and transform it into a powerful, visually compelling image prompt that is:\n\n1. Highly descriptive yet concise.\n2. Perfect for AI image generation (Gemini / Midjourney / Stable Diffusion).\n3. Aligned with the emotional tone of the overlay text.\n4. DSLR-level composition quality (unless the overlay demands something else).\n5. Avoids real people, real logos, copyrighted faces, or any impersonation.\n6. Uses thematic styling suitable for *AI news, tech updates, enterprise users*.\n7. Includes:\n   - **Subject**\n   - **Scene**\n   - **Mood**\n   - **Lighting**\n   - **Color palette**\n   - **Lens / composition**\n   - **Style** (clean, futuristic, cinematic, minimalistic)\n   - **What to avoid** (e.g., no text in the image, no watermarks)\n\nSTRICT OUTPUT RULES:\n- Output ONLY a JSON object.\n- JSON MUST start with \"{\" and end with \"}\".\n- Keys must use double quotes.\n- The JSON must contain:\n  {\n    \"prompts\": [\n      {\n        \"index\": <number>,\n        \"overlay_text\": \"<original overlay text>\",\n        \"prompt\": \"<full image prompt>\"\n      }\n    ]\n  }\n- Do NOT include markdown, commentary, explanations, or backticks.\n- Do NOT generate actual overlay text inside the image—only describe the visual.\n\nIMAGE PROMPT QUALITY GUIDELINES:\n- Use strong leading subject.\n- Keep the style visually consistent across images.\n- No clutter; no unnecessary objects.\n- No human faces unless conceptual silhouettes.\n- Use mood words: “high-contrast”, “dramatic”, “futuristic glow”, “neon rim light”, etc."
+            },
+            {
+              "content": "=Generate image prompts for the following Instagram carousel images.\n\nEach item contains only the overlay text. Use the system instructions to convert each one into a world-class image prompt.\n\nOutput rules:\n1. Include \\n in overlay text\n\nINPUT:\n{{ $json.images }}\n\nOUTPUT FORMAT (MANDATORY):\n{\n  \"prompts\": [\n    {\n      \"index\": <number>,\n      \"overlay_text\": \"<same text>\",\n      \"prompt\": \"<rich image prompt>\"\n    }\n  ]\n}\n"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2,
+      "position": [
+        3152,
+        -272
+      ],
+      "id": "1b217a5e-f127-48e1-b5ce-836f34e9004c",
+      "name": "Message a model4",
+      "credentials": {
+        "openAiApi": {
+          "id": "0mJw6adwDFRk62ts",
+          "name": "anvesh-openai"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Safely extract the assistant JSON text\nlet raw = null;\n\n// Try typical OpenAI → n8n structure\ntry {\n  raw = items[0].json.output[0].content[0].text;\n} catch (e) {}\n\n// Fallback search\nif (!raw) {\n  for (const key of Object.keys(items[0].json)) {\n    if (typeof items[0].json[key] === \"string\" && items[0].json[key].trim().startsWith(\"{\")) {\n      raw = items[0].json[key];\n      break;\n    }\n  }\n}\n\n// If still nothing → return an error\nif (!raw) {\n  return [{ json: { error: \"Could not find JSON text in input\", input: items[0].json }}];\n}\n\n// Remove code fences if present\nraw = raw.replace(/```json|```/g, \"\").trim();\n\n// 2. Parse JSON\nlet parsed;\ntry {\n  parsed = JSON.parse(raw);\n} catch (err) {\n  return [{ json: { error: \"JSON parse failed\", message: err.message, raw }}];\n}\n\n// 3. Return clean structure\nreturn [{\n  json: {\n    prompts: parsed.prompts || [],\n    No_of_images: parsed.prompts ? parsed.prompts.length : 0\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3536,
+        -272
+      ],
+      "id": "cfd8967d-68c3-4065-859e-1aaf5ba2eb39",
+      "name": "Code in JavaScript7"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "prompts",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        3840,
+        -272
+      ],
+      "id": "f4a8b859-4e8a-4392-932a-9531e5a089de",
+      "name": "Split Out1"
+    }
+  ],
+  "connections": {
+    "Message a model2": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items3": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Message a model2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript5": {
+      "main": [
+        [
+          {
+            "node": "Message a model3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields11": {
+      "main": [
+        [
+          {
+            "node": "Message a model4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model3": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript6": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields11",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model4": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript7",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript7": {
+      "main": [
+        [
+          {
+            "node": "Split Out1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out1": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "17e32a252a2a6e7730cfce5e5cc930969e2fb59d69180c6f036cdff498d50e7e"
+  }
+}
