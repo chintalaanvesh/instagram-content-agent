@@ -1,169 +1,133 @@
-# Instagram AI Content Agent  
-### **Automated AI-powered Instagram news generation, design & publishing pipeline**
+# Instagram Content Agent
 
-This repository contains an end-to-end automation system that **fetches AI news, ranks it, generates captions, designs carousel images, and logs everything to Google Sheets** — completely automatically.
+> Fully automated pipeline from news discovery to Instagram-ready content. RSS feeds in, polished carousel posts out — no manual intervention required.
 
-Built using **n8n**, **OpenAI GPT-4o**, **Google Gemini Imagen**, **Cloudinary**, and **Google Sheets**, it delivers polished Instagram-ready content with zero manual intervention.
+![n8n](https://img.shields.io/badge/n8n-EA4B71?logo=n8n&logoColor=white&style=flat-square)
+![OpenAI](https://img.shields.io/badge/GPT--4o-412991?logo=openai&logoColor=white&style=flat-square)
+![Gemini](https://img.shields.io/badge/Gemini_Imagen_4.0-4285F4?logo=google&logoColor=white&style=flat-square)
+![Cloudinary](https://img.shields.io/badge/Cloudinary-3448C5?logo=cloudinary&logoColor=white&style=flat-square)
+
+---
+
+## Pipeline Overview
+
+```
+RSS Feeds
+   → Relevance & virality scoring (GPT-4o)
+   → Top 3 stories selected
+   → Caption + hook + hashtag generation
+   → Image strategy (slide count, AI vs stock)
+   → AI image generation (Gemini Imagen 4.0)
+   → Post-processing + text overlay (Cloudinary)
+   → Content calendar log (Google Sheets)
+```
+
+Runs on a daily schedule or on-demand from within n8n.
 
 ---
 
 ## Features
 
-### **1. Automated AI News Fetching**
-- Reads RSS feeds from top tech & AI sites  
-- Cleans and normalizes article data  
-- Filters content based on publication time  
+**Content Discovery**
+- Ingests multiple RSS feeds from tech and AI publications
+- Filters articles by recency and normalizes metadata
 
-### **2. Relevance & Virality Scoring (LLM)**
-Each article is evaluated based on:
-- **Relevance**  
-- **Virality potential**  
-- **Recency**  
-- Weighted scoring system picks the *top 3* stories of the day  
+**LLM Scoring**
+- Each article is scored on relevance, virality potential, and recency
+- Weighted scoring selects the top 3 stories automatically
 
-### **3. Caption Generator**
-Creates:
-- High-converting **Hooks**  
-- Scroll-stopping **captions** (3–4 paragraphs)  
-- Optimized **hashtags**  
+**Caption Engine**
+- Generates scroll-stopping hooks, 3–4 paragraph captions, and optimized hashtags
+- Strict JSON output ensures reliable downstream parsing in n8n
 
-Strict JSON output ensures reliability with n8n workflows.
+**Image Strategy**
+- Decides slide count (1–4) and whether to use AI-generated or stock images per article
+- Generates detailed prompts for visual consistency across the carousel
 
-### **4. Image Strategy Engine**
-For each article:
-- Decides number of images (1–4)  
-- Determines whether to use **AI images** or **stock images**  
-- Generates **overlay text** for each slide  
+**AI Image Generation**
+- Gemini Imagen 4.0 Ultra produces cinematic, Instagram-native visuals
+- Each slide prompt is enriched from the article context
 
-### **5. AI Image Generation**
-- Uses **Gemini Imagen 4.0 Ultra** to create cinematic, IG-ready assets  
-- Converts overlay text into rich, world-class prompts  
-- Ensures visual consistency across carousel  
+**Cloudinary Post-Processing**
+- Applies background overlays and mobile-optimized text boxes
+- Returns final CDN URLs ready for scheduling
 
-### **6. Cloudinary Image Enhancement**
-- Adds background overlays  
-- Inserts the mobile-optimized text box  
-- Creates finalized **Instagram-ready** images  
-- Returns CDN URLs  
-
-### **7. Google Sheets Content Log**
-Automatically appends:
-- Hook  
-- Caption  
-- Hashtags  
-- Image URLs  
-- Index and tracking metadata  
-
-Functions as your long-term **content calendar**.
+**Content Calendar**
+- Appends hook, caption, hashtags, and image URLs to Google Sheets
+- Serves as a persistent, searchable content history
 
 ---
 
 ## Tech Stack
 
-| Technology | Purpose |
-|------------|---------|
-| **n8n** | Orchestration & workflow automation |
-| **OpenAI GPT-4o / GPT-mini** | Relevance scoring + text generation |
-| **Google Gemini Imagen 4.0** | AI image generation |
-| **Cloudinary** | Image hosting + post-processing |
-| **Google Drive & Sheets** | Content storage + logging |
-| **RSS Feeds** | Source of AI news |
+| Component | Technology |
+|-----------|------------|
+| Orchestration | n8n |
+| Text generation & scoring | OpenAI GPT-4o / GPT-4o-mini |
+| Image generation | Google Gemini Imagen 4.0 Ultra |
+| Image hosting & processing | Cloudinary |
+| Content calendar | Google Sheets |
+| News source | RSS feeds |
 
 ---
 
-## Security & Credentials
+## Setup
 
-This repository intentionally **does not include**:
-- API keys  
-- OAuth tokens  
-- Service account JSON  
-- Secrets  
+### Prerequisites
 
-All sensitive information must be configured inside **n8n Credentials Manager**.
+- n8n instance (self-hosted or cloud)
+- OpenAI API key
+- Google Gemini API key
+- Cloudinary account with an unsigned upload preset
+- Google Cloud project with Drive and Sheets API enabled
 
-Each module contains its own `CREDENTIALS.md` explaining:
-- Required credentials  
-- How to configure them after importing workflows  
-- What NOT to store in the repo  
+### Credentials
 
- **Always export n8n workflows WITHOUT credentials.**
+All credentials are managed inside n8n's Credentials Manager. This repository contains no API keys, OAuth tokens, or secrets.
 
----
+Create the following credentials in n8n before importing workflows:
 
-## Setup & Installation
+| Credential | Used By |
+|-----------|---------|
+| OpenAI API | Scoring and text generation |
+| Google Gemini API | Image generation |
+| Cloudinary | Image upload and transformation |
+| Google Drive OAuth2 | File access |
+| Google Sheets OAuth2 | Content calendar logging |
 
-### 1️⃣ Clone this repo
+Refer to each module's `CREDENTIALS.md` for field-by-field configuration instructions.
+
+### Installation
+
+1. Clone the repository:
+
 ```bash
-git clone https://github.com/<your-username>/instagram-content-agent.git
+git clone https://github.com/chintalaanvesh/instagram-content-agent.git
 cd instagram-content-agent
+```
 
-### 2️⃣ Import workflows into n8n
+2. Import each workflow JSON from `src/` into n8n via **Workflows → Import from File**.
 
-For each JSON inside `src/*`:
+3. Reconnect credentials in each imported workflow.
 
-- Open **n8n**
-- Go to **Workflows → Import from File**
-- Select the JSON workflow
-- Reconnect the required credentials
+4. Configure your Google Sheet with the following column headers:
+   `Index` · `Hook` · `Captions` · `Hashtags` · `Image 1`
 
----
-
-### 3️⃣ Connect required credentials in n8n
-
-You will need:
-
-- **OpenAI API credential**
-- **Google Gemini API credential**
-- **Cloudinary account & preset**
-- **Google Drive OAuth**
-- **Google Sheets OAuth**
-
-Ensure each credential is created in **n8n Credentials Manager** and matches the credential names used in the workflows.
+5. Activate the workflow or run it manually via **Execute Workflow**.
 
 ---
 
-### 4️⃣ Configure Google Sheet
+## Roadmap
 
-Ensure column names match this schema:
-
-- **Index**
-- **Hook**
-- **Captions**
-- **Hashtags**
-- **Image 1**
-
-These fields will be appended automatically during workflow execution.
-
----
-
-###
-The system is scheduled to run daily, but it can also be run manually from inside n8n:
-
-- Open workflow → Click **Execute Workflow**
-- Review output in Google Sheets
-
----
-
-### 🗺️ Roadmap
-
-- [ ] Automatic Instagram posting (Graph API)
-- [ ] LinkedIn + X (Twitter) cross-posting
-- [ ] Analytics dashboard (reach, CTR, saves)
+- [ ] Direct Instagram posting via Graph API
+- [ ] Cross-posting to LinkedIn and X
+- [ ] Analytics dashboard (reach, saves, CTR)
 - [ ] A/B testing for hooks and visuals
-- [ ] Multi-language generation
-- [ ] Fine-tuned LLM persona for higher CTR
+- [ ] Multi-language content generation
+- [ ] Persona-based fine-tuning for higher engagement
 
 ---
 
-### Contributing
+## License
 
-Contributions are welcome!  
-Please open an issue or submit a pull request.
-
----
-
-### License
-
-MIT License — free to use, modify, and build upon.
-
-
+MIT License. See [LICENSE](LICENSE) for details.
