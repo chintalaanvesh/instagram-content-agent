@@ -24,6 +24,10 @@ RSS Feeds
 
 Runs on a daily schedule or on-demand from within n8n.
 
+## Workflow Canvas
+
+![Instagram Content Agent — n8n Workflow](assets/workflow.png)
+
 ---
 
 ## Features
